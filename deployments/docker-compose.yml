@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  # Graph Database Engine (Memgraph com MAGE embutido)
+  graphdb:
+    image: memgraph/memgraph-mage:latest
+    container_name: ftfm-graphdb
+    restart: unless-stopped
+    ports:
+      - "7687:7687" # Protocolo Bolt (Neo4j / Memgraph)
+      - "7444:7444" # Logs e métricas
+    environment:
+      - MEMGRAPH="--storage-mode=IN_MEMORY_TRANSACTIONAL --memory-limit=8000"
+    volumes:
+      - mg_data:/var/lib/memgraph
+      - mg_log:/var/log/memgraph
+    networks:
+      - ftfm-net
+
+  # Interface Visual de Exploração de Grafos (Memgraph Lab)
+  graph-ui:
+    image: memgraph/lab:latest
+    container_name: ftfm-graph-ui
+    restart: unless-stopped
+    ports:
+      - "3000:3000" # Interface Web no navegador
+    environment:
+      - QUICK_CONNECT_MG_HOST=graphdb
+      - QUICK_CONNECT_MG_PORT=7687
+    depends_on:
+      - graphdb
+    networks:
+      - ftfm-net
+
+  # API Backend em Go
+  ftfm-api:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    container_name: ftfm-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - GRAPH_URI=bolt://graphdb:7687
+      - GRAPH_USER=
+      - GRAPH_PASSWORD=
+      - DATABASE_NAME=
+      - API_PORT=8080
+      - LOG_LEVEL=info
+    depends_on:
+      - graphdb
+    networks:
+      - ftfm-net
+
+networks:
+  ftfm-net:
+    driver: bridge
+
+volumes:
+  mg_data:
+  mg_log:
