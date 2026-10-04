@@ -62,6 +62,7 @@ func (s *Service) CreateConstraintsAndIndexes(ctx context.Context) error {
 		"CREATE CONSTRAINT ON (c:Candidate) ASSERT c.sq_candidate IS UNIQUE",
 		"CREATE CONSTRAINT ON (p:Person) ASSERT p.id IS UNIQUE",
 		"CREATE CONSTRAINT ON (e:Company) ASSERT e.cnpj IS UNIQUE",
+		"CREATE CONSTRAINT ON (a:Asset) ASSERT a.id IS UNIQUE",
 		"CREATE CONSTRAINT ON (cp:PublicContract) ASSERT cp.id_contract IS UNIQUE",
 		"CREATE CONSTRAINT ON (o:PublicAgency) ASSERT o.ug IS UNIQUE",
 		"CREATE INDEX ON :Company(cnpj_root)",
@@ -136,6 +137,7 @@ func (s *Service) BatchInsertAssets(ctx context.Context, assets []domain.Candida
 	rows := make([]map[string]any, len(assets))
 	for i, a := range assets {
 		rows[i] = map[string]any{
+			"id":   a.ID,
 			"sq":   a.SQCandidate,
 			"type": a.Type,
 			"desc": a.Description,
@@ -147,14 +149,13 @@ func (s *Service) BatchInsertAssets(ctx context.Context, assets []domain.Candida
 	query := `
 		UNWIND $batch AS row
 		MATCH (c:Candidate {sq_candidate: row.sq})
-		CREATE (b:Asset {
-			type: row.type,
-			description: row.desc,
-			value: row.val,
-			year: row.year
-		})
-		CREATE (c)-[:POSSUI_BEM]->(b)
-		SET c.total_assets = coalesce(c.total_assets, 0) + row.val
+		MERGE (b:Asset {id: row.id})
+		ON CREATE SET
+			b.type = row.type,
+			b.description = row.desc,
+			b.value = row.val,
+			b.year = row.year
+		MERGE (c)-[:POSSUI_BEM]->(b)
 	`
 
 	return s.executeWriteBatch(ctx, query, rows)

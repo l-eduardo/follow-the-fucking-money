@@ -59,6 +59,7 @@ type Candidate struct {
 
 // CandidateAsset represents an asset (bem) declared by a candidate to the TSE.
 type CandidateAsset struct {
+	ID           string      `json:"id"`
 	SQCandidate  string      `json:"sq_candidate"`
 	Type         string      `json:"type"`
 	Description  string      `json:"description"`

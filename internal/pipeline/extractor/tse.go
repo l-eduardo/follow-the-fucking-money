@@ -135,7 +135,11 @@ func ParseTSEAsset(record []string, year int) (*domain.CandidateAsset, error) {
 	valStr := strings.ReplaceAll(strings.TrimSpace(record[16]), ",", ".")
 	val, _ := strconv.ParseFloat(valStr, 64)
 
+	order := strings.TrimSpace(record[12])
+	assetID := fmt.Sprintf("BEM_%s_%s", sq, order)
+
 	return &domain.CandidateAsset{
+		ID:           assetID,
 		SQCandidate:  sq,
 		Type:         streamutil.NormalizeText(record[14]),
 		Description:  streamutil.NormalizeText(record[15]),
