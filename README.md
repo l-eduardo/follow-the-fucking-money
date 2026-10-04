@@ -144,16 +144,19 @@ make build
 ./bin/ftfm ingest tse --year 2022 --source ./downloads/tse/2022/
 ```
 
-### 5. Iniciar o Servidor de API REST
+### 5. Iniciar Tudo com Comando Único (All-in-One)
 ```bash
-make run-server
+./setup_and_run.sh
+# ou via make: make start-all
 ```
+Isso sobe os containers, aplica as constraints/índices, faz o download do TSE 2022, ingere os dados e expõe a API REST na porta **8075**!
+
 Endpoints disponíveis:
-* `GET http://localhost:8080/health`
-* `GET http://localhost:8080/api/v1/stats`
-* `GET http://localhost:8080/api/v1/trail?from=...&to=...`
-* `GET http://localhost:8080/api/v1/patterns/quid-pro-quo?year=2022`
-* `GET http://localhost:8080/api/v1/patterns/ghost-suppliers?year=2022`
+* `GET http://localhost:8075/health`
+* `GET http://localhost:8075/api/v1/stats`
+* `GET http://localhost:8075/api/v1/trail?from=...&to=...`
+* `GET http://localhost:8075/api/v1/patterns/quid-pro-quo?year=2022`
+* `GET http://localhost:8075/api/v1/patterns/ghost-suppliers?year=2022`
 
 ---
 

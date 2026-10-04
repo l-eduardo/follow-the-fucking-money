@@ -20,7 +20,7 @@ RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 COPY --from=builder /app/bin/ftfm /app/ftfm
 
-EXPOSE 8080
+EXPOSE 8075
 
 ENTRYPOINT ["/app/ftfm"]
-CMD ["server", "--port", "8080"]
+CMD ["server", "--port", "8075"]

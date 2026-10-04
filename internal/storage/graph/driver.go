@@ -50,7 +50,7 @@ func (s *Service) Close(ctx context.Context) error {
 	return s.driver.Close(ctx)
 }
 
-// CreateConstraintsAndIndexes applies uniqueness constraints and lookup indexes.
+// CreateConstraintsAndIndexes applies uniqueness constraints and lookup indexes using auto-commit transactions.
 func (s *Service) CreateConstraintsAndIndexes(ctx context.Context) error {
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{
 		DatabaseName: s.dbName,
@@ -59,26 +59,24 @@ func (s *Service) CreateConstraintsAndIndexes(ctx context.Context) error {
 	defer session.Close(ctx)
 
 	queries := []string{
-		"CREATE CONSTRAINT IF NOT EXISTS FOR (c:Candidate) REQUIRE c.sq_candidate IS UNIQUE",
-		"CREATE CONSTRAINT IF NOT EXISTS FOR (p:Person) REQUIRE p.id IS UNIQUE",
-		"CREATE CONSTRAINT IF NOT EXISTS FOR (e:Company) REQUIRE e.cnpj IS UNIQUE",
-		"CREATE CONSTRAINT IF NOT EXISTS FOR (cp:PublicContract) REQUIRE cp.id_contract IS UNIQUE",
-		"CREATE CONSTRAINT IF NOT EXISTS FOR (o:PublicAgency) REQUIRE o.ug IS UNIQUE",
-		"CREATE INDEX IF NOT EXISTS FOR (e:Company) ON (e.cnpj_root)",
-		"CREATE INDEX IF NOT EXISTS FOR (p:Person) ON (p.masked_cpf)",
-		"CREATE INDEX IF NOT EXISTS FOR (c:Candidate) ON (c.ballot_name)",
+		"CREATE CONSTRAINT ON (c:Candidate) ASSERT c.sq_candidate IS UNIQUE",
+		"CREATE CONSTRAINT ON (p:Person) ASSERT p.id IS UNIQUE",
+		"CREATE CONSTRAINT ON (e:Company) ASSERT e.cnpj IS UNIQUE",
+		"CREATE CONSTRAINT ON (cp:PublicContract) ASSERT cp.id_contract IS UNIQUE",
+		"CREATE CONSTRAINT ON (o:PublicAgency) ASSERT o.ug IS UNIQUE",
+		"CREATE INDEX ON :Company(cnpj_root)",
+		"CREATE INDEX ON :Person(masked_cpf)",
+		"CREATE INDEX ON :Candidate(ballot_name)",
 	}
 
 	for _, q := range queries {
-		_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-			res, err := tx.Run(ctx, q, nil)
-			if err != nil {
-				return nil, err
-			}
-			return res.Consume(ctx)
-		})
+		res, err := session.Run(ctx, q, nil)
 		if err != nil {
-			log.Warn().Err(err).Str("query", q).Msg("Constraint/Index notice (may already exist or engine dialect variant)")
+			log.Debug().Err(err).Str("query", q).Msg("Constraint/Index notice (may already exist)")
+			continue
+		}
+		if _, err := res.Consume(ctx); err != nil {
+			log.Debug().Err(err).Str("query", q).Msg("Constraint/Index consume notice")
 		}
 	}
 

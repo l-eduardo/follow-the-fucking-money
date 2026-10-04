@@ -33,9 +33,10 @@ cmd_help() {
     echo -e "  ${CYAN}logs${RESET}          Exibe logs dos containers"
     echo -e "  ${CYAN}ps${RESET}            Lista status dos containers\n"
     echo -e "${YELLOW}Desenvolvimento & Operações:${RESET}"
+    echo -e "  ${CYAN}start-all${RESET}     Sobe todo o serviço completo (Docker, DB, índices, download, ingestão e API :8075)"
     echo -e "  ${CYAN}build${RESET}         Compila o binário CLI em bin/ftfm"
     echo -e "  ${CYAN}test${RESET}          Executa os testes unitários"
-    echo -e "  ${CYAN}run${RESET}           Executa o servidor de API localmente (:8080)"
+    echo -e "  ${CYAN}run${RESET}           Executa o servidor de API localmente (:8075)"
     echo -e "  ${CYAN}status${RESET}        Verifica conectividade com o Graph DB e nós"
     echo -e "  ${CYAN}init-db${RESET}       Aplica constraints UNIQUE e índices no grafo\n"
     echo -e "${YELLOW}Dados & Ingestão:${RESET}"
@@ -96,13 +97,16 @@ cmd_init_db() {
 
 cmd_run() {
     cmd_build
-    echo -e "${CYAN}⚡ Iniciando servidor API na porta 8080...${RESET}"
-    ./${BIN_PATH} server --port 8080
+    echo -e "${CYAN}⚡ Iniciando servidor API na porta 8075...${RESET}"
+    ./${BIN_PATH} server --port 8075
 }
 
 TARGET="${1:-help}"
 
 case "${TARGET}" in
+    start-all|up-all)
+        ./setup_and_run.sh
+        ;;
     help)
         cmd_help
         ;;

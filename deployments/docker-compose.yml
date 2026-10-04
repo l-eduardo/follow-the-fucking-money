@@ -8,8 +8,7 @@ services:
     ports:
       - "7687:7687" # Protocolo Bolt (Neo4j / Memgraph)
       - "7444:7444" # Logs e métricas
-    environment:
-      - MEMGRAPH="--storage-mode=IN_MEMORY_TRANSACTIONAL --memory-limit=8000"
+    command: ["--query-modules-directory="]
     volumes:
       - mg_data:/var/lib/memgraph
       - mg_log:/var/log/memgraph
@@ -39,13 +38,13 @@ services:
     container_name: ftfm-api
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8075:8075"
     environment:
       - GRAPH_URI=bolt://graphdb:7687
       - GRAPH_USER=
       - GRAPH_PASSWORD=
       - DATABASE_NAME=
-      - API_PORT=8080
+      - API_PORT=8075
       - LOG_LEVEL=info
     depends_on:
       - graphdb

@@ -100,10 +100,14 @@ init-db: build ## Aplica constraints UNIQUE e índices no banco de grafos
 	@echo -e "$(CYAN)⚙️ Aplicando constraints e índices no Graph DB...$(RESET)"
 	./$(BIN_PATH) status --create-indexes
 
+.PHONY: start-all
+start-all: ## Sobe todo o serviço completo (Docker, DB, índices, download, ingestão e API na porta 8075)
+	@./setup_and_run.sh
+
 .PHONY: run
-run: build ## Executa o servidor de API REST localmente na porta 8080
-	@echo -e "$(CYAN)⚡ Iniciando servidor de API na porta 8080...$(RESET)"
-	./$(BIN_PATH) server --port 8080
+run: build ## Executa o servidor de API REST localmente na porta 8075
+	@echo -e "$(CYAN)⚡ Iniciando servidor de API na porta 8075...$(RESET)"
+	./$(BIN_PATH) server --port 8075
 
 ##@ Dados & Ingestão
 .PHONY: download-tse

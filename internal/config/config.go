@@ -28,7 +28,7 @@ func LoadConfig() *Config {
 		DatabaseName: getEnv("DATABASE_NAME", ""),
 		BatchSize:    getEnvInt("BATCH_SIZE", 5000),
 		MaxWorkers:   getEnvInt("MAX_WORKERS", runtime.NumCPU()*2),
-		APIPort:      getEnvInt("API_PORT", 8080),
+		APIPort:      getEnvInt("API_PORT", 8075),
 		MetricsPort:  getEnvInt("METRICS_PORT", 9090),
 		LogLevel:     getEnv("LOG_LEVEL", "info"),
 	}
