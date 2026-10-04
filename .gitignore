@@ -1,7 +1,7 @@
 # Binaries
 bin/
 dist/
-ftfm
+/ftfm
 
 # Go dependencies
 vendor/

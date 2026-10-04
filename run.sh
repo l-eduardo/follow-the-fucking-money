@@ -64,7 +64,7 @@ cmd_up() {
     echo -e "${GREEN}✓ Stack em execução!${RESET}"
     echo -e "  • Memgraph (Bolt): ${CYAN}bolt://localhost:7687${RESET}"
     echo -e "  • Memgraph Lab (UI): ${CYAN}http://localhost:3000${RESET}"
-    echo -e "  • FTFM REST API: ${CYAN}http://localhost:8080${RESET}"
+    echo -e "  • FTFM REST API: ${CYAN}http://localhost:8075${RESET}"
 }
 
 cmd_up_graph() {
@@ -107,7 +107,8 @@ TARGET="${1:-help}"
 
 case "${TARGET}" in
     start-all|up-all)
-        ./setup_and_run.sh
+        shift || true
+        ./setup_and_run.sh "$@"
         ;;
     help)
         cmd_help
@@ -146,7 +147,8 @@ case "${TARGET}" in
         cmd_run
         ;;
     download-tse)
-        ./scripts/download_tse.sh 2022
+        shift || true
+        ./scripts/download_tse.sh 2022 "$@"
         ;;
     clean)
         rm -rf "${BIN_DIR}" cover.out coverage.html

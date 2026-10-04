@@ -5,13 +5,14 @@
 # Este script executa o fluxo completo do projeto:
 # 1. Compila o binário CLI em Go (bin/ftfm)
 # 2. Sobe o banco Memgraph (7687) e a interface visual Memgraph Lab (3000)
-# 3. Aguarda a prontidão do banco e aplica constraints e índices no grafo
-# 4. Baixa os dados da eleição de 2022 do TSE (caso ainda não estejam baixados)
+# 3. Aguarda a prontidão real do banco e aplica constraints e índices no grafo
+# 4. Baixa os dados da eleição de 2022 do TSE (com barra de progresso e resume)
 # 5. Ingere os dados eleitorais no grafo via streaming concorrente
 # 6. Inicia a API REST exposta na porta 8075
 # ==============================================================================
 
 set -euo pipefail
+trap 'echo -e "\n\033[31m❌ Ocorreu uma interrupção ou erro na linha $LINENO.\033[0m"' ERR
 
 # Cores para o terminal
 CYAN='\033[36m'
@@ -29,6 +30,8 @@ BIN_DIR="bin"
 BIN_NAME="ftfm"
 BIN_PATH="${BIN_DIR}/${BIN_NAME}"
 DOWNLOAD_DIR="./downloads/tse/2022"
+
+EXTRA_ARGS=("$@")
 
 echo -e "\n${BOLD}${GREEN}==============================================================================${RESET}"
 echo -e "${BOLD}${GREEN}  🚀 Follow-The-Fucking-Money (FTFM) - Inicialização Completa${RESET}"
@@ -48,19 +51,22 @@ echo -e "${GREEN}✓ Binário compilado com sucesso!${RESET}\n"
 echo -e "${CYAN}▶ Passo 2/5: Subindo Memgraph e Memgraph Lab (Docker)...${RESET}"
 ${COMPOSE_CMD} up -d graphdb graph-ui
 
-echo -e "${CYAN}⏳ Aguardando Memgraph estar pronto para conexões Bolt na porta 7687...${RESET}"
-for i in {1..30}; do
-    if python3 -c 'import socket; s = socket.socket(); s.connect(("127.0.0.1", 7687)); s.close()' 2>/dev/null; then
-        echo -e "${GREEN}✓ Conexão Bolt ativa na porta 7687!${RESET}"
+echo -e "${CYAN}⏳ Aguardando Memgraph inicializar e responder ao protocolo Bolt (7687)...${RESET}"
+READY=false
+for i in $(seq 1 45); do
+    if ./"${BIN_PATH}" status >/dev/null 2>&1; then
+        READY=true
+        echo -e "\n${GREEN}✓ Memgraph online e respondendo na porta 7687!${RESET}"
         break
     fi
     echo -n "."
     sleep 1
-    if [ "$i" -eq 30 ]; then
-        echo -e "\n${RED}⚠️ Timeout aguardando o Memgraph. Verifique com 'docker logs ftfm-graphdb'.${RESET}"
-        exit 1
-    fi
 done
+
+if [ "${READY}" != "true" ]; then
+    echo -e "\n${RED}⚠️ Timeout aguardando o Memgraph. Verifique com 'docker logs ftfm-graphdb'.${RESET}"
+    exit 1
+fi
 echo ""
 
 # ------------------------------------------------------------------------------
@@ -74,20 +80,17 @@ echo -e "${GREEN}✓ Constraints e índices aplicados!${RESET}\n"
 # 4. Download dos dados do TSE (se ainda não existirem)
 # ------------------------------------------------------------------------------
 echo -e "${CYAN}▶ Passo 4/5: Verificando dados da eleição 2022 do TSE...${RESET}"
-if [ -f "${DOWNLOAD_DIR}/consulta_cand_2022.zip" ] && [ -f "${DOWNLOAD_DIR}/receitas_despesas_2022.zip" ]; then
-    echo -e "${GREEN}✓ Dados do TSE já presentes em ${DOWNLOAD_DIR}!${RESET}"
-else
-    echo -e "${YELLOW}📥 Baixando dados públicos oficiais do TSE (2022)...${RESET}"
-    ./scripts/download_tse.sh 2022
-fi
+./scripts/download_tse.sh 2022 "${DOWNLOAD_DIR}" "${EXTRA_ARGS[@]}"
 echo ""
 
 # ------------------------------------------------------------------------------
 # 5. Ingestão dos dados no Grafo
 # ------------------------------------------------------------------------------
 echo -e "${CYAN}▶ Passo 5/5: Executando pipeline de ingestão no banco de grafos...${RESET}"
-if [ -d "${DOWNLOAD_DIR}" ]; then
+if [ -d "${DOWNLOAD_DIR}" ] && [ "$(find "${DOWNLOAD_DIR}" -maxdepth 1 -name '*.zip' -o -name '*.csv' | wc -l)" -gt 0 ]; then
     ./"${BIN_PATH}" ingest tse --year 2022 --source "${DOWNLOAD_DIR}" --batch-size 5000 --workers 8 || echo -e "${YELLOW}⚠️ Aviso na ingestão (dados parciais carregados)${RESET}"
+else
+    echo -e "${YELLOW}ℹ️ Nenhum arquivo encontrado em ${DOWNLOAD_DIR} para ingestão imediata.${RESET}"
 fi
 
 echo -e "\n${BOLD}${GREEN}==============================================================================${RESET}"
