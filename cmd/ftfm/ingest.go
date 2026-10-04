@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -32,11 +33,48 @@ var ingestCmd = &cobra.Command{
 	Short: "Ingestão e processamento em lote de dados públicos para o grafo",
 }
 
+func formatNumber(n int) string {
+	in := strconv.Itoa(n)
+	out := make([]byte, 0, len(in)+len(in)/3)
+	remainder := len(in) % 3
+	if remainder > 0 {
+		out = append(out, in[:remainder]...)
+		if len(in) > remainder {
+			out = append(out, '.')
+		}
+	}
+	for i := remainder; i < len(in); i += 3 {
+		out = append(out, in[i:i+3]...)
+		if i+3 < len(in) {
+			out = append(out, '.')
+		}
+	}
+	return string(out)
+}
+
+func printProgress(category string, count int, start time.Time) {
+	elapsed := time.Since(start).Seconds()
+	rate := 0.0
+	if elapsed > 0 {
+		rate = float64(count) / elapsed
+	}
+	fmt.Printf("\r  ⏳ [%s] %s registros gravados | ~%.0f reg/seg", category, formatNumber(count), rate)
+}
+
+func printDone(category string, count int, start time.Time) {
+	elapsed := time.Since(start).Seconds()
+	rate := 0.0
+	if elapsed > 0 {
+		rate = float64(count) / elapsed
+	}
+	fmt.Printf("\r  ✓ [%s] %s registros gravados no grafo com sucesso! (em %.1fs | ~%.0f reg/s)\n", category, formatNumber(count), elapsed, rate)
+}
+
 var ingestTSECmd = &cobra.Command{
 	Use:   "tse",
-	Short: "Ingere dados eleitorais do TSE (candidaturas, receitas e despesas)",
+	Short: "Ingere dados eleitorais do TSE (candidaturas, bens, receitas e despesas)",
 	Example: `  ftfm ingest tse --year 2022 --source ./downloads/tse/consulta_cand_2022.zip
-  ftfm ingest tse --year 2022 --source ./downloads/tse/`,
+  ftfm ingest tse --year 2022 --source ./downloads/tse/2022/`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
@@ -47,16 +85,12 @@ var ingestTSECmd = &cobra.Command{
 		}
 		defer svc.Close(ctx)
 
-		log.Info().
-			Int("ano", tseYear).
-			Str("origem", sourcePath).
-			Int("batch_size", batchSize).
-			Msg("Iniciando ingestão do TSE")
+		fmt.Printf("\n🚀 Iniciando Ingestão de Dados Eleitorais TSE (%d)\n", tseYear)
+		fmt.Printf("   Origem: %s | Batch Size: %d | Workers: %d\n\n", sourcePath, batchSize, workersCount)
 
 		start := time.Now()
 		totalProcessed := 0
 
-		// Identify if target is a file or directory
 		fileInfo, err := os.Stat(sourcePath)
 		if err != nil {
 			return fmt.Errorf("caminho de origem não encontrado: %w", err)
@@ -76,10 +110,12 @@ var ingestTSECmd = &cobra.Command{
 
 		for _, filePath := range filesToProcess {
 			fileName := filepath.Base(filePath)
-			log.Info().Str("arquivo", fileName).Msg("Processando arquivo do TSE")
 
 			if strings.Contains(fileName, "consulta_cand") {
-				// Process Candidates
+				fmt.Printf("🏛️  [Candidaturas & Partidos] Processando %s...\n", fileName)
+				catStart := time.Now()
+				catCount := 0
+
 				pool := worker.NewPool(workersCount, 20000, batchSize, 2*time.Second, func(row []string) (*domain.Candidate, error) {
 					return extractor.ParseTSECandidate(row, tseYear)
 				})
@@ -88,7 +124,6 @@ var ingestTSECmd = &cobra.Command{
 				var writerWG sync.WaitGroup
 				writerWG.Add(1)
 
-				// Writer loop
 				go func() {
 					defer writerWG.Done()
 					for batch := range batchChan {
@@ -96,6 +131,8 @@ var ingestTSECmd = &cobra.Command{
 							log.Error().Err(err).Int("batch_size", len(batch)).Msg("Erro inserindo candidatos")
 						} else {
 							totalProcessed += len(batch)
+							catCount += len(batch)
+							printProgress("Candidatos", catCount, catStart)
 						}
 					}
 				}()
@@ -106,65 +143,14 @@ var ingestTSECmd = &cobra.Command{
 				})
 				pool.Close()
 				writerWG.Wait()
-
-			} else if strings.Contains(fileName, "receitas") {
-				// Process Donations
-				pool := worker.NewPool(workersCount, 20000, batchSize, 2*time.Second, func(row []string) (*domain.Donation, error) {
-					return extractor.ParseTSEDonation(row, tseYear)
-				})
-
-				batchChan := pool.Start(ctx)
-				var writerWG sync.WaitGroup
-				writerWG.Add(1)
-
-				go func() {
-					defer writerWG.Done()
-					for batch := range batchChan {
-						if err := svc.BatchInsertDonations(ctx, batch); err != nil {
-							log.Error().Err(err).Int("batch_size", len(batch)).Msg("Erro inserindo doações")
-						} else {
-							totalProcessed += len(batch)
-						}
-					}
-				}()
-
-				_ = streamutil.StreamZipCSV(ctx, filePath, ';', true, func(record []string) error {
-					pool.Submit(record)
-					return nil
-				})
-				pool.Close()
-				writerWG.Wait()
-
-			} else if strings.Contains(fileName, "despesas") {
-				// Process Expenses
-				pool := worker.NewPool(workersCount, 20000, batchSize, 2*time.Second, func(row []string) (*domain.Expense, error) {
-					return extractor.ParseTSEExpense(row, tseYear)
-				})
-
-				batchChan := pool.Start(ctx)
-				var writerWG sync.WaitGroup
-				writerWG.Add(1)
-
-				go func() {
-					defer writerWG.Done()
-					for batch := range batchChan {
-						if err := svc.BatchInsertExpenses(ctx, batch); err != nil {
-							log.Error().Err(err).Int("batch_size", len(batch)).Msg("Erro inserindo despesas")
-						} else {
-							totalProcessed += len(batch)
-						}
-					}
-				}()
-
-				_ = streamutil.StreamZipCSV(ctx, filePath, ';', true, func(record []string) error {
-					pool.Submit(record)
-					return nil
-				})
-				pool.Close()
-				writerWG.Wait()
+				printDone("Candidatos", catCount, catStart)
+				fmt.Println()
 
 			} else if strings.Contains(fileName, "bem_candidato") {
-				// Process Declared Assets
+				fmt.Printf("💎 [Patrimônio & Bens Declarados] Processando %s...\n", fileName)
+				catStart := time.Now()
+				catCount := 0
+
 				pool := worker.NewPool(workersCount, 20000, batchSize, 2*time.Second, func(row []string) (*domain.CandidateAsset, error) {
 					return extractor.ParseTSEAsset(row, tseYear)
 				})
@@ -180,6 +166,8 @@ var ingestTSECmd = &cobra.Command{
 							log.Error().Err(err).Int("batch_size", len(batch)).Msg("Erro inserindo bens de candidatos")
 						} else {
 							totalProcessed += len(batch)
+							catCount += len(batch)
+							printProgress("Bens Declarados", catCount, catStart)
 						}
 					}
 				}()
@@ -190,13 +178,160 @@ var ingestTSECmd = &cobra.Command{
 				})
 				pool.Close()
 				writerWG.Wait()
+				printDone("Bens Declarados", catCount, catStart)
+				fmt.Println()
+
+			} else if strings.Contains(fileName, "receitas_despesas") || strings.Contains(fileName, "prestacao_de_contas") {
+				// Process BOTH Donations AND Expenses from this master package
+				// 1. Ingest Donations
+				fmt.Printf("💰 [Doações de Campanha] Processando receitas em %s...\n", fileName)
+				donStart := time.Now()
+				donCount := 0
+
+				poolDon := worker.NewPool(workersCount, 20000, batchSize, 2*time.Second, func(row []string) (*domain.Donation, error) {
+					return extractor.ParseTSEDonation(row, tseYear)
+				})
+
+				batchChanDon := poolDon.Start(ctx)
+				var writerWGDon sync.WaitGroup
+				writerWGDon.Add(1)
+
+				go func() {
+					defer writerWGDon.Done()
+					for batch := range batchChanDon {
+						if err := svc.BatchInsertDonations(ctx, batch); err != nil {
+							log.Error().Err(err).Int("batch_size", len(batch)).Msg("Erro inserindo doações")
+						} else {
+							totalProcessed += len(batch)
+							donCount += len(batch)
+							printProgress("Doações", donCount, donStart)
+						}
+					}
+				}()
+
+				_ = streamutil.StreamZipCSVFilter(ctx, filePath, ';', true, func(entryName string) bool {
+					return strings.HasPrefix(entryName, "receitas_candidatos_") && !strings.Contains(entryName, "doador_originario")
+				}, func(record []string) error {
+					poolDon.Submit(record)
+					return nil
+				})
+				poolDon.Close()
+				writerWGDon.Wait()
+				printDone("Doações", donCount, donStart)
+				fmt.Println()
+
+				// 2. Ingest Expenses
+				fmt.Printf("💳 [Despesas & Fornecedores] Processando despesas em %s...\n", fileName)
+				expStart := time.Now()
+				expCount := 0
+
+				poolExp := worker.NewPool(workersCount, 20000, batchSize, 2*time.Second, func(row []string) (*domain.Expense, error) {
+					return extractor.ParseTSEExpense(row, tseYear)
+				})
+
+				batchChanExp := poolExp.Start(ctx)
+				var writerWGExp sync.WaitGroup
+				writerWGExp.Add(1)
+
+				go func() {
+					defer writerWGExp.Done()
+					for batch := range batchChanExp {
+						if err := svc.BatchInsertExpenses(ctx, batch); err != nil {
+							log.Error().Err(err).Int("batch_size", len(batch)).Msg("Erro inserindo despesas")
+						} else {
+							totalProcessed += len(batch)
+							expCount += len(batch)
+							printProgress("Despesas", expCount, expStart)
+						}
+					}
+				}()
+
+				_ = streamutil.StreamZipCSVFilter(ctx, filePath, ';', true, func(entryName string) bool {
+					return strings.HasPrefix(entryName, "despesas_contratadas_candidatos_")
+				}, func(record []string) error {
+					poolExp.Submit(record)
+					return nil
+				})
+				poolExp.Close()
+				writerWGExp.Wait()
+				printDone("Despesas", expCount, expStart)
+				fmt.Println()
+
+			} else if strings.Contains(fileName, "receitas") {
+				fmt.Printf("💰 [Doações de Campanha] Processando %s...\n", fileName)
+				catStart := time.Now()
+				catCount := 0
+
+				pool := worker.NewPool(workersCount, 20000, batchSize, 2*time.Second, func(row []string) (*domain.Donation, error) {
+					return extractor.ParseTSEDonation(row, tseYear)
+				})
+
+				batchChan := pool.Start(ctx)
+				var writerWG sync.WaitGroup
+				writerWG.Add(1)
+
+				go func() {
+					defer writerWG.Done()
+					for batch := range batchChan {
+						if err := svc.BatchInsertDonations(ctx, batch); err != nil {
+							log.Error().Err(err).Int("batch_size", len(batch)).Msg("Erro inserindo doações")
+						} else {
+							totalProcessed += len(batch)
+							catCount += len(batch)
+							printProgress("Doações", catCount, catStart)
+						}
+					}
+				}()
+
+				_ = streamutil.StreamZipCSV(ctx, filePath, ';', true, func(record []string) error {
+					pool.Submit(record)
+					return nil
+				})
+				pool.Close()
+				writerWG.Wait()
+				printDone("Doações", catCount, catStart)
+				fmt.Println()
+
+			} else if strings.Contains(fileName, "despesas") {
+				fmt.Printf("💳 [Despesas & Fornecedores] Processando %s...\n", fileName)
+				catStart := time.Now()
+				catCount := 0
+
+				pool := worker.NewPool(workersCount, 20000, batchSize, 2*time.Second, func(row []string) (*domain.Expense, error) {
+					return extractor.ParseTSEExpense(row, tseYear)
+				})
+
+				batchChan := pool.Start(ctx)
+				var writerWG sync.WaitGroup
+				writerWG.Add(1)
+
+				go func() {
+					defer writerWG.Done()
+					for batch := range batchChan {
+						if err := svc.BatchInsertExpenses(ctx, batch); err != nil {
+							log.Error().Err(err).Int("batch_size", len(batch)).Msg("Erro inserindo despesas")
+						} else {
+							totalProcessed += len(batch)
+							catCount += len(batch)
+							printProgress("Despesas", catCount, catStart)
+						}
+					}
+				}()
+
+				_ = streamutil.StreamZipCSV(ctx, filePath, ';', true, func(record []string) error {
+					pool.Submit(record)
+					return nil
+				})
+				pool.Close()
+				writerWG.Wait()
+				printDone("Despesas", catCount, catStart)
+				fmt.Println()
 			}
 		}
 
-		log.Info().
-			Int("registros_processados", totalProcessed).
-			Dur("duracao", time.Since(start)).
-			Msg("Ingestão TSE concluída com sucesso")
+		fmt.Println("==============================================================================")
+		fmt.Printf("🎉 INGESTÃO TOTAL CONCLUÍDA: %s registros gravados no grafo em %s!\n", formatNumber(totalProcessed), time.Since(start).Round(time.Second))
+		fmt.Println("==============================================================================")
 
 		return nil
 	},

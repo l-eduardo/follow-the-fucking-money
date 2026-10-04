@@ -16,9 +16,10 @@ import (
 // CSVRowHandler is called for each parsed CSV record.
 type CSVRowHandler func(record []string) error
 
-// StreamZipCSV reads CSV files inside a .zip file and invokes handler on each record.
+// StreamZipCSVFilter reads matching CSV files inside a .zip file and invokes handler on each record.
 // Automatically supports Latin1 (ISO-8859-1) decode when isLatin1 is true.
-func StreamZipCSV(ctx context.Context, zipPath string, delimiter rune, isLatin1 bool, onRow CSVRowHandler) error {
+// If filter is non-nil, only entry names for which filter returns true will be processed.
+func StreamZipCSVFilter(ctx context.Context, zipPath string, delimiter rune, isLatin1 bool, filter func(entryName string) bool, onRow CSVRowHandler) error {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return fmt.Errorf("failed to open zip file %s: %w", zipPath, err)
@@ -32,9 +33,13 @@ func StreamZipCSV(ctx context.Context, zipPath string, delimiter rune, isLatin1 
 		default:
 		}
 
-		// Only process CSV or TXT files
-		ext := strings.ToLower(filepath.Ext(file.Name))
+		baseName := filepath.Base(file.Name)
+		ext := strings.ToLower(filepath.Ext(baseName))
 		if ext != ".csv" && ext != ".txt" {
+			continue
+		}
+
+		if filter != nil && !filter(baseName) {
 			continue
 		}
 
@@ -76,7 +81,7 @@ func StreamZipCSV(ctx context.Context, zipPath string, delimiter rune, isLatin1 
 				break
 			}
 			if err != nil {
-				// Log error and continue to avoid failing entire 50GB file on 1 bad line
+				// Skip individual malformed line to preserve rest of file
 				continue
 			}
 
@@ -90,4 +95,9 @@ func StreamZipCSV(ctx context.Context, zipPath string, delimiter rune, isLatin1 
 	}
 
 	return nil
+}
+
+// StreamZipCSV reads all CSV files inside a .zip file and invokes handler on each record.
+func StreamZipCSV(ctx context.Context, zipPath string, delimiter rune, isLatin1 bool, onRow CSVRowHandler) error {
+	return StreamZipCSVFilter(ctx, zipPath, delimiter, isLatin1, nil, onRow)
 }
