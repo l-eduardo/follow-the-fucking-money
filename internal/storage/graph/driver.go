@@ -191,7 +191,8 @@ func (s *Service) BatchInsertDonations(ctx context.Context, donations []domain.D
 
 	query := `
 		UNWIND $batch AS row
-		MATCH (c:Candidate {sq_candidate: row.recipient_sq})
+		MERGE (c:Candidate {sq_candidate: row.recipient_sq})
+		ON CREATE SET c.name = row.recipient_name, c.year = row.year
 		FOREACH (_ IN CASE WHEN row.donor_type = 'PF' THEN [1] ELSE [] END |
 			MERGE (p:Person {id: row.donor_id})
 			ON CREATE SET p.name = row.donor_name
@@ -238,7 +239,7 @@ func (s *Service) BatchInsertExpenses(ctx context.Context, expenses []domain.Exp
 
 	query := `
 		UNWIND $batch AS row
-		MATCH (c:Candidate {sq_candidate: row.candidate_sq})
+		MERGE (c:Candidate {sq_candidate: row.candidate_sq})
 		FOREACH (_ IN CASE WHEN row.supplier_type = 'PF' THEN [1] ELSE [] END |
 			MERGE (p:Person {id: row.supplier_doc})
 			ON CREATE SET p.name = row.supplier_name
