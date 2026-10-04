@@ -162,6 +162,34 @@ var ingestTSECmd = &cobra.Command{
 				})
 				pool.Close()
 				writerWG.Wait()
+
+			} else if strings.Contains(fileName, "bem_candidato") {
+				// Process Declared Assets
+				pool := worker.NewPool(workersCount, 20000, batchSize, 2*time.Second, func(row []string) (*domain.CandidateAsset, error) {
+					return extractor.ParseTSEAsset(row, tseYear)
+				})
+
+				batchChan := pool.Start(ctx)
+				var writerWG sync.WaitGroup
+				writerWG.Add(1)
+
+				go func() {
+					defer writerWG.Done()
+					for batch := range batchChan {
+						if err := svc.BatchInsertAssets(ctx, batch); err != nil {
+							log.Error().Err(err).Int("batch_size", len(batch)).Msg("Erro inserindo bens de candidatos")
+						} else {
+							totalProcessed += len(batch)
+						}
+					}
+				}()
+
+				_ = streamutil.StreamZipCSV(ctx, filePath, ';', true, func(record []string) error {
+					pool.Submit(record)
+					return nil
+				})
+				pool.Close()
+				writerWG.Wait()
 			}
 		}
 

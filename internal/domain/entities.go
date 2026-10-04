@@ -57,6 +57,16 @@ type Candidate struct {
 	Lineage         DataLineage `json:"lineage"`
 }
 
+// CandidateAsset represents an asset (bem) declared by a candidate to the TSE.
+type CandidateAsset struct {
+	SQCandidate  string      `json:"sq_candidate"`
+	Type         string      `json:"type"`
+	Description  string      `json:"description"`
+	Value        float64     `json:"value"`
+	ElectionYear int         `json:"election_year"`
+	Lineage      DataLineage `json:"lineage"`
+}
+
 // Donation represents a campaign contribution to a candidate or party.
 type Donation struct {
 	IDTransaction  string      `json:"id_transaction"`

@@ -37,7 +37,7 @@ func ParseTSECandidate(record []string, year int) (*domain.Candidate, error) {
 		ElectionYear: year,
 		Party:        strings.ToUpper(strings.TrimSpace(record[27])),
 		State:        strings.ToUpper(strings.TrimSpace(record[11])),
-		ResultStatus: streamutil.NormalizeText(record[len(record)-2]),
+		ResultStatus: streamutil.NormalizeText(record[len(record)-1]),
 		Lineage: domain.DataLineage{
 			SourceSystem: "TSE_CONSULTA_CAND",
 			ExtractedAt:  time.Now(),
@@ -119,3 +119,32 @@ func ParseTSEExpense(record []string, year int) (*domain.Expense, error) {
 		},
 	}, nil
 }
+
+// ParseTSEAsset parses a row from bem_candidato_{YEAR}_{UF}.csv
+func ParseTSEAsset(record []string, year int) (*domain.CandidateAsset, error) {
+	if len(record) < 17 {
+		return nil, fmt.Errorf("insufficient columns in asset record: %d", len(record))
+	}
+
+	// Col 11: SQ_CANDIDATO, Col 14: DS_TIPO_BEM_CANDIDATO, Col 15: DS_BEM_CANDIDATO, Col 16: VR_BEM_CANDIDATO
+	sq := strings.TrimSpace(record[11])
+	if sq == "" || sq == "-1" {
+		return nil, fmt.Errorf("invalid SQ_CANDIDATO")
+	}
+
+	valStr := strings.ReplaceAll(strings.TrimSpace(record[16]), ",", ".")
+	val, _ := strconv.ParseFloat(valStr, 64)
+
+	return &domain.CandidateAsset{
+		SQCandidate:  sq,
+		Type:         streamutil.NormalizeText(record[14]),
+		Description:  streamutil.NormalizeText(record[15]),
+		Value:        val,
+		ElectionYear: year,
+		Lineage: domain.DataLineage{
+			SourceSystem: "TSE_BEM_CANDIDATO",
+			ExtractedAt:  time.Now(),
+		},
+	}, nil
+}
+

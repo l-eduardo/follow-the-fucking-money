@@ -127,6 +127,39 @@ func (s *Service) BatchInsertCandidates(ctx context.Context, candidates []domain
 	return s.executeWriteBatch(ctx, query, rows)
 }
 
+// BatchInsertAssets creates Asset nodes and connects them to Candidate via POSSUI_BEM.
+func (s *Service) BatchInsertAssets(ctx context.Context, assets []domain.CandidateAsset) error {
+	if len(assets) == 0 {
+		return nil
+	}
+
+	rows := make([]map[string]any, len(assets))
+	for i, a := range assets {
+		rows[i] = map[string]any{
+			"sq":   a.SQCandidate,
+			"type": a.Type,
+			"desc": a.Description,
+			"val":  a.Value,
+			"year": a.ElectionYear,
+		}
+	}
+
+	query := `
+		UNWIND $batch AS row
+		MATCH (c:Candidate {sq_candidate: row.sq})
+		CREATE (b:Asset {
+			type: row.type,
+			description: row.desc,
+			value: row.val,
+			year: row.year
+		})
+		CREATE (c)-[:POSSUI_BEM]->(b)
+		SET c.total_assets = coalesce(c.total_assets, 0) + row.val
+	`
+
+	return s.executeWriteBatch(ctx, query, rows)
+}
+
 // BatchInsertDonations merges donors and creates DOOU_PARA relationships.
 func (s *Service) BatchInsertDonations(ctx context.Context, donations []domain.Donation) error {
 	if len(donations) == 0 {
