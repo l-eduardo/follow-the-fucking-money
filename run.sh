@@ -152,7 +152,7 @@ case "${TARGET}" in
         rm -rf "${BIN_DIR}" cover.out coverage.html
         echo -e "${GREEN}✓ Binários compilados e caches removidos.${RESET}"
         ;;
-    clean-all|purge)
+    clean-all|purge|purgr)
         ./scripts/clean_all.sh
         ;;
     ingest-tse)
