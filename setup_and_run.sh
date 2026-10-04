@@ -29,8 +29,13 @@ COMPOSE_CMD="docker compose -p ${PROJECT_NAME} -f ${COMPOSE_FILE}"
 BIN_DIR="bin"
 BIN_NAME="ftfm"
 BIN_PATH="${BIN_DIR}/${BIN_NAME}"
-DOWNLOAD_DIR="./downloads/tse/2022"
 
+YEAR="2026"
+if [[ "${1:-}" =~ ^[0-9]{4}$ ]]; then
+    YEAR="$1"
+    shift
+fi
+DOWNLOAD_DIR="./downloads/tse/${YEAR}"
 EXTRA_ARGS=("$@")
 
 echo -e "\n${BOLD}${GREEN}==============================================================================${RESET}"
@@ -79,8 +84,8 @@ echo -e "${GREEN}✓ Constraints e índices aplicados!${RESET}\n"
 # ------------------------------------------------------------------------------
 # 4. Download dos dados do TSE (se ainda não existirem)
 # ------------------------------------------------------------------------------
-echo -e "${CYAN}▶ Passo 4/5: Verificando dados da eleição 2022 do TSE...${RESET}"
-./scripts/download_tse.sh 2022 "${DOWNLOAD_DIR}" "${EXTRA_ARGS[@]}"
+echo -e "${CYAN}▶ Passo 4/5: Verificando dados da eleição ${YEAR} do TSE...${RESET}"
+./scripts/download_tse.sh "${YEAR}" "${DOWNLOAD_DIR}" "${EXTRA_ARGS[@]}"
 echo ""
 
 # ------------------------------------------------------------------------------
@@ -88,7 +93,7 @@ echo ""
 # ------------------------------------------------------------------------------
 echo -e "${CYAN}▶ Passo 5/5: Executando pipeline de ingestão no banco de grafos...${RESET}"
 if [ -d "${DOWNLOAD_DIR}" ] && [ "$(find "${DOWNLOAD_DIR}" -maxdepth 1 -name '*.zip' -o -name '*.csv' | wc -l)" -gt 0 ]; then
-    ./"${BIN_PATH}" ingest tse --year 2022 --source "${DOWNLOAD_DIR}" --batch-size 5000 --workers 8 || echo -e "${YELLOW}⚠️ Aviso na ingestão (dados parciais carregados)${RESET}"
+    ./"${BIN_PATH}" ingest tse --year "${YEAR}" --source "${DOWNLOAD_DIR}" --batch-size 5000 --workers 8 || echo -e "${YELLOW}⚠️ Aviso na ingestão (dados parciais carregados)${RESET}"
 else
     echo -e "${YELLOW}ℹ️ Nenhum arquivo encontrado em ${DOWNLOAD_DIR} para ingestão imediata.${RESET}"
 fi

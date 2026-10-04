@@ -114,16 +114,18 @@ run: build ## Executa o servidor de API REST localmente na porta 8075
 	@echo -e "$(CYAN)⚡ Iniciando servidor de API na porta 8075...$(RESET)"
 	./$(BIN_PATH) server --port 8075
 
+YEAR ?= 2026
+
 ##@ Dados & Ingestão
 .PHONY: download-tse
-download-tse: ## Baixa os dados da eleição geral de 2022 do TSE
-	@echo -e "$(CYAN)📥 Baixando dados eleitorais do TSE (2022)...$(RESET)"
-	./scripts/download_tse.sh 2022
+download-tse: ## Baixa os dados da eleição do TSE (ex: make download-tse YEAR=2026)
+	@echo -e "$(CYAN)📥 Baixando dados eleitorais do TSE ($(YEAR))...$(RESET)"
+	./scripts/download_tse.sh $(YEAR)
 
 .PHONY: ingest-tse
-ingest-tse: build ## Inicia o pipeline de ingestão do TSE para o ano 2022
-	@echo -e "$(CYAN)📦 Ingerindo candidaturas, receitas e despesas no grafo...$(RESET)"
-	./$(BIN_PATH) ingest tse --year 2022 --source ./downloads/tse/2022/
+ingest-tse: build ## Inicia o pipeline de ingestão do TSE (ex: make ingest-tse YEAR=2026)
+	@echo -e "$(CYAN)📦 Ingerindo candidaturas, bens, receitas e despesas no grafo ($(YEAR))...$(RESET)"
+	./$(BIN_PATH) ingest tse --year $(YEAR) --source ./downloads/tse/$(YEAR)/
 
 ##@ Consultas & Investigação
 .PHONY: query-qpq

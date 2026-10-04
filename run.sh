@@ -148,7 +148,9 @@ case "${TARGET}" in
         ;;
     download-tse)
         shift || true
-        ./scripts/download_tse.sh 2022 "$@"
+        YEAR="${1:-2026}"
+        shift || true
+        ./scripts/download_tse.sh "${YEAR}" "$@"
         ;;
     clean)
         rm -rf "${BIN_DIR}" cover.out coverage.html
@@ -158,8 +160,11 @@ case "${TARGET}" in
         ./scripts/clean_all.sh
         ;;
     ingest-tse)
+        shift || true
+        YEAR="${1:-2026}"
+        shift || true
         cmd_build
-        ./${BIN_PATH} ingest tse --year 2022 --source ./downloads/tse/2022/
+        ./${BIN_PATH} ingest tse --year "${YEAR}" --source "./downloads/tse/${YEAR}/" "$@"
         ;;
     *)
         echo -e "${RED}Comando desconhecido: ${TARGET}${RESET}"
