@@ -12,7 +12,11 @@ vendor/
 
 # Data and Downloads
 data/
-downloads/
+downloads/**
+!downloads/
+!downloads/**/
+!downloads/.gitkeep
+!downloads/**/.gitkeep
 *.zip
 *.csv
 *.parquet

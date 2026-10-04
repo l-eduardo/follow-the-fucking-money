@@ -38,7 +38,9 @@ cmd_help() {
     echo -e "  ${CYAN}test${RESET}          Executa os testes unitários"
     echo -e "  ${CYAN}run${RESET}           Executa o servidor de API localmente (:8075)"
     echo -e "  ${CYAN}status${RESET}        Verifica conectividade com o Graph DB e nós"
-    echo -e "  ${CYAN}init-db${RESET}       Aplica constraints UNIQUE e índices no grafo\n"
+    echo -e "  ${CYAN}init-db${RESET}       Aplica constraints UNIQUE e índices no grafo"
+    echo -e "  ${CYAN}clean${RESET}         Remove binários compilados locais"
+    echo -e "  ${CYAN}purge${RESET}         Limpeza TOTAL (containers, volumes, imagens Docker e downloads)\n"
     echo -e "${YELLOW}Dados & Ingestão:${RESET}"
     echo -e "  ${CYAN}download-tse${RESET}  Baixa dados eleitorais de 2022 do TSE"
     echo -e "  ${CYAN}ingest-tse${RESET}    Ingere dados de 2022 no banco de grafos"
@@ -145,6 +147,13 @@ case "${TARGET}" in
         ;;
     download-tse)
         ./scripts/download_tse.sh 2022
+        ;;
+    clean)
+        rm -rf "${BIN_DIR}" cover.out coverage.html
+        echo -e "${GREEN}✓ Binários compilados e caches removidos.${RESET}"
+        ;;
+    clean-all|purge)
+        ./scripts/clean_all.sh
         ;;
     ingest-tse)
         cmd_build

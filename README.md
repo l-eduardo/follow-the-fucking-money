@@ -158,6 +158,14 @@ Endpoints disponíveis:
 * `GET http://localhost:8075/api/v1/patterns/quid-pro-quo?year=2022`
 * `GET http://localhost:8075/api/v1/patterns/ghost-suppliers?year=2022`
 
+### 6. Limpeza Completa (Purge Total)
+Para parar e remover **tudo** (containers, volumes, imagens Docker, binários e arquivos baixados), mantendo a pasta `downloads/` rastreada no git:
+```bash
+./scripts/clean_all.sh
+# ou via make: make clean-all (ou make purge)
+# ou via runner: ./run.sh purge
+```
+
 ---
 
 ## ⚖️ Aviso Legal e Isenção de Responsabilidade (Legal Disclaimer)

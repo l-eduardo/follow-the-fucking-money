@@ -46,10 +46,15 @@ test: ## Executa todos os testes unitários com cobertura
 	go test -v -race -cover ./...
 
 .PHONY: clean
-clean: ## Remove binários compilados e arquivos temporários
+clean: ## Remove binários compilados e arquivos temporários locais
 	@echo -e "$(YELLOW)🧹 Limpando binários e arquivos gerados...$(RESET)"
 	rm -rf $(BIN_DIR) cover.out coverage.html
 	@echo -e "$(GREEN)✓ Limpeza concluída.$(RESET)"
+
+.PHONY: clean-all purge
+clean-all: purge
+purge: ## Limpeza TOTAL: para e remove containers, volumes, imagens Docker e arquivos baixados
+	@./scripts/clean_all.sh
 
 ##@ Infraestrutura (Docker Compose)
 .PHONY: up
