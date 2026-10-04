@@ -106,8 +106,8 @@ init-db: build ## Aplica constraints UNIQUE e índices no banco de grafos
 	./$(BIN_PATH) status --create-indexes
 
 .PHONY: start-all
-start-all: ## Sobe todo o serviço completo (Docker, DB, índices, download, ingestão e API na porta 8075)
-	@./setup_and_run.sh
+start-all: ## Sobe todo o serviço completo para 2026 (Docker, DB, índices, download 2026, ingestão 2026 e API na porta 8075)
+	@./setup_and_run.sh 2026
 
 .PHONY: run
 run: build ## Executa o servidor de API REST localmente na porta 8075

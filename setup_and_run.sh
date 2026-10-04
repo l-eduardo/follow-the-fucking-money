@@ -39,7 +39,7 @@ DOWNLOAD_DIR="./downloads/tse/${YEAR}"
 EXTRA_ARGS=("$@")
 
 echo -e "\n${BOLD}${GREEN}==============================================================================${RESET}"
-echo -e "${BOLD}${GREEN}  🚀 Follow-The-Fucking-Money (FTFM) - Inicialização Completa${RESET}"
+echo -e "${BOLD}${GREEN}  🚀 Follow-The-Fucking-Money (FTFM) - Inicialização Completa (Eleição ${YEAR})${RESET}"
 echo -e "${BOLD}${GREEN}==============================================================================${RESET}\n"
 
 # ------------------------------------------------------------------------------
@@ -108,8 +108,8 @@ echo -e "\n${YELLOW}${BOLD}Exemplos de testes da API via terminal:${RESET}"
 echo -e "  curl http://localhost:${PORT}/health"
 echo -e "  curl http://localhost:${PORT}/api/v1/stats"
 echo -e "  curl \"http://localhost:${PORT}/api/v1/trail?from=00000000000191&to=LULA\""
-echo -e "  curl \"http://localhost:${PORT}/api/v1/patterns/quid-pro-quo?year=2022\""
-echo -e "  curl \"http://localhost:${PORT}/api/v1/patterns/ghost-suppliers?year=2022\""
+echo -e "  curl \"http://localhost:${PORT}/api/v1/patterns/quid-pro-quo?year=${YEAR}\""
+echo -e "  curl \"http://localhost:${PORT}/api/v1/patterns/ghost-suppliers?year=${YEAR}\""
 echo -e "${BOLD}${GREEN}==============================================================================${RESET}\n"
 
 echo -e "${CYAN}⚡ Iniciando servidor de API na porta ${PORT} (Ctrl+C para encerrar)...${RESET}\n"

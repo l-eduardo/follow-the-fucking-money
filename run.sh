@@ -108,7 +108,7 @@ TARGET="${1:-help}"
 case "${TARGET}" in
     start-all|up-all)
         shift || true
-        ./setup_and_run.sh "$@"
+        ./setup_and_run.sh 2026 "$@"
         ;;
     help)
         cmd_help
