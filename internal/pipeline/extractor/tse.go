@@ -47,16 +47,17 @@ func ParseTSECandidate(record []string, year int) (*domain.Candidate, error) {
 
 // ParseTSEDonation parses a row from receitas_candidatos_{YEAR}_{UF}.csv
 func ParseTSEDonation(record []string, year int) (*domain.Donation, error) {
-	if len(record) < 35 {
+	if len(record) < 57 {
 		return nil, fmt.Errorf("insufficient columns in donation record: %d", len(record))
 	}
 
-	// Col 16: SQ_CANDIDATO, Col 17: NM_CANDIDATO
-	// Col 24: NR_CPF_CNPJ_DOADOR, Col 25: NM_DOADOR
-	// Col 30: VR_RECEITA, Col 28: DT_RECEITA
-	candidateSQ := strings.TrimSpace(record[16])
-	donorDoc := brazil.CleanCPF(record[24])
-	if candidateSQ == "" || donorDoc == "" {
+	// Col 18: SQ_CANDIDATO, Col 20: NM_CANDIDATO
+	// Col 36: NR_CPF_CNPJ_DOADOR, Col 37: NM_DOADOR
+	// Col 51: NR_RECIBO_DOACAO, Col 53: SQ_RECEITA
+	// Col 54: DT_RECEITA, Col 56: VR_RECEITA
+	candidateSQ := strings.TrimSpace(record[18])
+	donorDoc := brazil.CleanCPF(record[36])
+	if candidateSQ == "" || donorDoc == "" || donorDoc == "-1" {
 		return nil, fmt.Errorf("empty candidate or donor ID")
 	}
 
@@ -65,20 +66,28 @@ func ParseTSEDonation(record []string, year int) (*domain.Donation, error) {
 		donorType = "PJ"
 	}
 
-	valStr := strings.ReplaceAll(strings.TrimSpace(record[30]), ",", ".")
+	valStr := strings.ReplaceAll(strings.TrimSpace(record[56]), ",", ".")
 	amount, _ := strconv.ParseFloat(valStr, 64)
+	if amount <= 0 {
+		return nil, fmt.Errorf("zero or negative donation amount")
+	}
 
-	txID := fmt.Sprintf("DON_%d_%s_%s_%d", year, candidateSQ, donorDoc, int64(amount*100))
+	sqReceita := strings.TrimSpace(record[53])
+	txID := fmt.Sprintf("DON_%d_%s_%s", year, candidateSQ, sqReceita)
+	if sqReceita == "" || sqReceita == "-1" {
+		txID = fmt.Sprintf("DON_%d_%s_%s_%d", year, candidateSQ, donorDoc, int64(amount*100))
+	}
 
 	return &domain.Donation{
 		IDTransaction: txID,
 		DonorType:     donorType,
 		DonorID:       donorDoc,
-		DonorName:     streamutil.NormalizeText(record[25]),
+		DonorName:     streamutil.NormalizeText(record[37]),
 		RecipientSQ:   candidateSQ,
-		RecipientName: streamutil.NormalizeText(record[17]),
+		RecipientName: streamutil.NormalizeText(record[20]),
 		Amount:        amount,
-		DonationDate:  strings.TrimSpace(record[28]),
+		DonationDate:  strings.TrimSpace(record[54]),
+		ReceiptNumber: strings.TrimSpace(record[51]),
 		ElectionYear:  year,
 		Lineage: domain.DataLineage{
 			SourceSystem: "TSE_RECEITAS_CANDIDATOS",
@@ -89,29 +98,41 @@ func ParseTSEDonation(record []string, year int) (*domain.Donation, error) {
 
 // ParseTSEExpense parses a row from despesas_contratadas_candidatos_{YEAR}_{UF}.csv
 func ParseTSEExpense(record []string, year int) (*domain.Expense, error) {
-	if len(record) < 30 {
+	if len(record) < 53 {
 		return nil, fmt.Errorf("insufficient columns in expense record: %d", len(record))
 	}
 
-	candidateSQ := strings.TrimSpace(record[16])
-	supplierCNPJ := brazil.CleanCNPJ(record[25])
-	if candidateSQ == "" || supplierCNPJ == "" {
+	// Col 18: SQ_CANDIDATO, Col 20: NM_CANDIDATO
+	// Col 30: NR_CPF_CNPJ_FORNECEDOR, Col 31: NM_FORNECEDOR
+	// Col 46: NR_DOCUMENTO, Col 49: SQ_DESPESA
+	// Col 50: DT_DESPESA, Col 51: DS_DESPESA, Col 52: VR_DESPESA_CONTRATADA
+	candidateSQ := strings.TrimSpace(record[18])
+	supplierDoc := brazil.CleanCNPJ(record[30])
+	if candidateSQ == "" || supplierDoc == "" || supplierDoc == "-1" {
 		return nil, fmt.Errorf("empty candidate or supplier ID")
 	}
 
-	valStr := strings.ReplaceAll(strings.TrimSpace(record[29]), ",", ".")
+	valStr := strings.ReplaceAll(strings.TrimSpace(record[52]), ",", ".")
 	amount, _ := strconv.ParseFloat(valStr, 64)
+	if amount <= 0 {
+		return nil, fmt.Errorf("zero or negative expense amount")
+	}
 
-	txID := fmt.Sprintf("EXP_%d_%s_%s_%d", year, candidateSQ, supplierCNPJ, int64(amount*100))
+	sqDespesa := strings.TrimSpace(record[49])
+	txID := fmt.Sprintf("EXP_%d_%s_%s", year, candidateSQ, sqDespesa)
+	if sqDespesa == "" || sqDespesa == "-1" {
+		txID = fmt.Sprintf("EXP_%d_%s_%s_%d", year, candidateSQ, supplierDoc, int64(amount*100))
+	}
 
 	return &domain.Expense{
 		IDTransaction: txID,
 		CandidateSQ:   candidateSQ,
-		SupplierCNPJ:  supplierCNPJ,
-		SupplierName:  streamutil.NormalizeText(record[26]),
+		SupplierCNPJ:  supplierDoc,
+		SupplierName:  streamutil.NormalizeText(record[31]),
 		Amount:        amount,
-		ExpenseDate:   strings.TrimSpace(record[28]),
-		Description:   streamutil.NormalizeText(record[len(record)-3]),
+		ExpenseDate:   strings.TrimSpace(record[50]),
+		Description:   streamutil.NormalizeText(record[51]),
+		InvoiceNumber: strings.TrimSpace(record[46]),
 		ElectionYear:  year,
 		Lineage: domain.DataLineage{
 			SourceSystem: "TSE_DESPESAS_CANDIDATOS",

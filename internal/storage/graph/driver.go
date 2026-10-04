@@ -217,11 +217,17 @@ func (s *Service) BatchInsertExpenses(ctx context.Context, expenses []domain.Exp
 
 	rows := make([]map[string]any, len(expenses))
 	for i, e := range expenses {
+		suppType := "PF"
+		if len(e.SupplierCNPJ) == 14 {
+			suppType = "PJ"
+		}
+
 		rows[i] = map[string]any{
 			"id_tx":         e.IDTransaction,
 			"candidate_sq":  e.CandidateSQ,
-			"supplier_cnpj": e.SupplierCNPJ,
+			"supplier_doc":  e.SupplierCNPJ,
 			"supplier_name": e.SupplierName,
+			"supplier_type": suppType,
 			"amount":        e.Amount,
 			"date":          e.ExpenseDate,
 			"description":   e.Description,
@@ -233,15 +239,28 @@ func (s *Service) BatchInsertExpenses(ctx context.Context, expenses []domain.Exp
 	query := `
 		UNWIND $batch AS row
 		MATCH (c:Candidate {sq_candidate: row.candidate_sq})
-		MERGE (comp:Company {cnpj: row.supplier_cnpj})
-		ON CREATE SET comp.legal_name = row.supplier_name
-		MERGE (comp)-[r:FORNECEU_PARA {id_tx: row.id_tx}]->(c)
-		ON CREATE SET
-			r.amount = row.amount,
-			r.date = row.date,
-			r.description = row.description,
-			r.invoice = row.invoice,
-			r.year = row.year
+		FOREACH (_ IN CASE WHEN row.supplier_type = 'PF' THEN [1] ELSE [] END |
+			MERGE (p:Person {id: row.supplier_doc})
+			ON CREATE SET p.name = row.supplier_name
+			MERGE (p)-[r:FORNECEU_PARA {id_tx: row.id_tx}]->(c)
+			ON CREATE SET
+				r.amount = row.amount,
+				r.date = row.date,
+				r.description = row.description,
+				r.invoice = row.invoice,
+				r.year = row.year
+		)
+		FOREACH (_ IN CASE WHEN row.supplier_type = 'PJ' THEN [1] ELSE [] END |
+			MERGE (comp:Company {cnpj: row.supplier_doc})
+			ON CREATE SET comp.legal_name = row.supplier_name
+			MERGE (comp)-[r:FORNECEU_PARA {id_tx: row.id_tx}]->(c)
+			ON CREATE SET
+				r.amount = row.amount,
+				r.date = row.date,
+				r.description = row.description,
+				r.invoice = row.invoice,
+				r.year = row.year
+		)
 	`
 
 	return s.executeWriteBatch(ctx, query, rows)
