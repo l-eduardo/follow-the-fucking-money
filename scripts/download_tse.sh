@@ -52,16 +52,29 @@ download_file() {
     else
         echo -e "${CYAN}⬇️ Baixando ${filename} (${desc})...${RESET}"
         if [ -f "${target}" ]; then
-            echo -e "${YELLOW}↪️ Arquivo parcial detectado. Retomando download...${RESET}"
+            echo -e "${YELLOW}↪️ Arquivo parcial detectado. Retomando download de onde parou...${RESET}"
         fi
-        curl -fL --progress-bar -C - --retry 3 --retry-delay 2 -o "${target}" "${url}" || {
-            echo -e "${YELLOW}⚠️ Aviso: Falha ao baixar ${filename} de ${url}${RESET}"
-            return 0
-        }
-        if is_valid_zip "${target}"; then
-            echo -e "${GREEN}✓ Download concluído e verificado: ${filename}${RESET}"
+
+        echo -e "${YELLOW}📊 Acompanhamento de progresso em tempo real (%, velocidade, tempo estimado):${RESET}"
+        if command -v wget >/dev/null 2>&1; then
+            wget -c -q --show-progress --tries=3 -O "${target}" "${url}" || {
+                echo -e "${YELLOW}⚠️ Aviso: Falha ao baixar ${filename} com wget. Tentando com curl...${RESET}"
+                curl -fL --progress-bar -C - --retry 3 --retry-delay 2 -o "${target}" "${url}" || {
+                    echo -e "${YELLOW}⚠️ Erro ao baixar ${filename} de ${url}${RESET}"
+                    return 0
+                }
+            }
         else
-            echo -e "${YELLOW}⚠️ Download concluído, mas validação do arquivo zip falhou.${RESET}"
+            curl -fL --progress-bar -C - --retry 3 --retry-delay 2 -o "${target}" "${url}" || {
+                echo -e "${YELLOW}⚠️ Erro ao baixar ${filename} de ${url}${RESET}"
+                return 0
+            }
+        fi
+
+        if is_valid_zip "${target}"; then
+            echo -e "${GREEN}✓ Download concluído e verificado com sucesso: ${filename}${RESET}"
+        else
+            echo -e "${YELLOW}⚠️ Download concluído, mas o arquivo zip parece parcial ou corrompido.${RESET}"
         fi
     fi
 }
