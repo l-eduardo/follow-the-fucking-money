@@ -1,5 +1,4 @@
-version: "3.8"
-
+# Docker Compose definition for Follow-The-Fucking-Money (FTFM)
 services:
   # Graph Database Engine (Memgraph com MAGE embutido)
   graphdb:
